@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Contracts are pinned to the tag
+        run: git -C vendor/bis fetch --tags --quiet && git -C vendor/bis describe --tags --exact-match HEAD
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check . && ruff format --check .
+      - name: Types
+        run: mypy
+      - name: Unit tests
+        run: pytest -q
+
+  db:
+    # Migrations and inbox idempotency against a real Postgres.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cia
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: cia
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cia" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      CIA_PG_HOST: 127.0.0.1
+      CIA_PG_PORT: "5432"
+      CIA_PG_PASSWORD: ci-only
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: pytest -q -m db
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - run: docker build -t cia-app .
+      - name: Image starts and finds the contracts
+        run: docker run --rm cia-app python -c "from cia import contracts; assert 'insight.v1' in contracts.names()"
