@@ -1,0 +1,42 @@
+name: cia
+
+# Runs next to the BIS stack (compose project `bis`) and uses its Postgres (database `cia`).
+# No public port: the BIS frontend nginx routes /cia/ to cia-api.
+
+x-cia: &cia
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  image: cia-app
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    CIA_PG_HOST: postgres
+    CIA_PG_PORT: "5432"
+  networks: [bis]
+
+services:
+  cia-api:
+    <<: *cia
+    command: ["sh", "-c", "cia migrate && cia api --host 0.0.0.0 --port 8000"]
+    ports:
+      - "127.0.0.1:${CIA_API_PORT:-8200}:8000"
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  cia-worker:
+    <<: *cia
+    command: ["cia", "worker"]
+    mem_limit: 512m
+    depends_on:
+      cia-api:
+        condition: service_healthy  # migrations ran
+
+networks:
+  bis:
+    external: true
+    name: bis_default

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "central-intelligence-agent"
+version = "0.1.0"
+description = "Agent system on top of the Business-Intelligence-System: central agent, department agents, actions"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi==0.142.2",
+    "uvicorn[standard]==0.54.0",
+    "psycopg[binary]==3.3.6",
+    "pydantic==2.13.5",
+    "httpx==0.28.1",
+    "jsonschema==4.26.0",  # incoming events are validated against the pinned BIS contracts
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1", "ruff==0.14.1", "mypy==2.4.0"]
+
+[project.scripts]
+cia = "cia.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["cia*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+extend-exclude = ["vendor"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+# Loose: catch obvious type errors without annotating every test.
+python_version = "3.13"
+packages = ["cia"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["db: needs a running Postgres (CIA_PG_* variables); skipped otherwise"]

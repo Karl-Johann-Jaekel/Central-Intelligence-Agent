@@ -1,0 +1,3 @@
+[submodule "vendor/bis"]
+	path = vendor/bis
+	url = https://github.com/Karl-Johann-Jaekel/Business-Intelligence-System.git
