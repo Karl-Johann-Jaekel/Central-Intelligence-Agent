@@ -13,6 +13,7 @@ x-cia: &cia
   environment:
     CIA_PG_HOST: postgres
     CIA_PG_PORT: "5432"
+    CIA_BIS_API_URL: http://api:8000
   networks: [bis]
 
 services:

@@ -45,3 +45,33 @@ def test_duplicate_store_keeps_one_row(dsn):
     finally:
         with psycopg.connect(dsn) as conn:
             conn.execute("DELETE FROM inbox.events WHERE event_id = %s", (event_id,))
+
+
+def test_trace_store_writes_runs_and_spans(dsn):
+    from cia.llm.provider import Usage
+    from cia.telemetry.tracer import PostgresTraceStore, trace_run
+
+    store = PostgresTraceStore(dsn)
+    with trace_run(store, "admin", trigger_ref="test") as run:
+        with run.span("step", "situation"):
+            with run.span("llm", "prioritise", role="central") as span:
+                span.record_usage(Usage("mistral", "m", 10, 5, 0.25))
+                span.attributes["path"] = "/api/v1/health"
+    try:
+        with psycopg.connect(dsn) as conn:
+            [(status, ended)] = conn.execute(
+                "SELECT status, ended_at IS NOT NULL FROM telemetry.runs WHERE run_id = %s", (run.run_id,)
+            )
+            spans = conn.execute(
+                """
+                SELECT name, parent_span_id IS NOT NULL, status, tokens_in, cost_eur, attributes->>'path'
+                FROM telemetry.spans WHERE run_id = %s ORDER BY started_at
+                """,
+                (run.run_id,),
+            ).fetchall()
+        assert (status, ended) == ("completed", True)
+        assert [s[:4] for s in spans] == [("situation", False, "ok", None), ("prioritise", True, "ok", 10)]
+        assert float(spans[1][4]) == 0.25 and spans[1][5] == "/api/v1/health"
+    finally:
+        with psycopg.connect(dsn) as conn:
+            conn.execute("DELETE FROM telemetry.runs WHERE run_id = %s", (run.run_id,))
