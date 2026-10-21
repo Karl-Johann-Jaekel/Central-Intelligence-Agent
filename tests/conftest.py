@@ -39,3 +39,29 @@ class MemoryInbox:
 @pytest.fixture
 def inbox() -> MemoryInbox:
     return MemoryInbox()
+
+
+class FakeProvider:
+    """Scripted LLM provider: returns (or raises) the queued answers in order and records prompts.
+    Same routing check as the real providers."""
+
+    name = "fake"
+    model = "fake-model"
+
+    def __init__(self, *answers, allowed=frozenset({"public"}), tokens=(100, 20)):
+        self.answers = list(answers)
+        self.allowed_data_classes = allowed
+        self.tokens = tokens
+        self.calls: list = []
+        self.prompts: list[dict] = []
+
+    def generate(self, system, user, schema, data_class):
+        from cia.llm.provider import Usage, check_route
+
+        check_route(self, data_class)
+        self.prompts.append({"system": system, "user": user, "schema": schema, "data_class": data_class})
+        self.calls.append(Usage(self.name, self.model, *self.tokens, 0.0))
+        answer = self.answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return schema.model_validate(answer)
