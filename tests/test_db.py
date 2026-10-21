@@ -75,3 +75,31 @@ def test_trace_store_writes_runs_and_spans(dsn):
     finally:
         with psycopg.connect(dsn) as conn:
             conn.execute("DELETE FROM telemetry.runs WHERE run_id = %s", (run.run_id,))
+
+
+def test_report_store_and_schedule_trigger(dsn):
+    from datetime import date
+
+    from cia.agents.reports import PostgresReportStore
+    from cia.telemetry.tracer import PostgresTraceStore, trace_run
+
+    with trace_run(PostgresTraceStore(dsn), "schedule") as run:
+        pass
+    store = PostgresReportStore(dsn)
+    insight_id = str(uuid.uuid4())
+    report = {
+        "report_id": str(uuid.uuid4()),
+        "run_id": run.run_id,
+        "sim_date": "2099-01-09",
+        "mode": "fallback",
+        "topics": [{"insight_ids": [insight_id]}],
+    }
+    try:
+        store.save(report)
+        assert store.for_sim_date(date(2099, 1, 9)) == report
+        assert store.latest() == report  # far-future sim_date sorts first
+        assert store.reported_insight_ids(date(2099, 1, 10), 7) == {insight_id}
+        assert store.reported_insight_ids(date(2099, 1, 9), 7) == set()  # same day is not "earlier"
+    finally:
+        with psycopg.connect(dsn) as conn:
+            conn.execute("DELETE FROM telemetry.runs WHERE run_id = %s", (run.run_id,))

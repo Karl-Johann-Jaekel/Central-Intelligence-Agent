@@ -81,3 +81,22 @@ def llm_price_eur_per_mtok() -> tuple[float, float]:
         float(os.getenv("CIA_LLM_PRICE_IN_EUR_PER_MTOK", "0")),
         float(os.getenv("CIA_LLM_PRICE_OUT_EUR_PER_MTOK", "0")),
     )
+
+
+# --- central agent ----------------------------------------------------------------------------
+
+
+def max_topics() -> int:
+    """Topics per report (plan section 5.1: start with 3)."""
+    return int(os.getenv("CIA_MAX_TOPICS", "3"))
+
+
+def run_token_budget() -> int:
+    """Tokens (in + out) per run; above it the run ends with the report without agent text."""
+    return int(os.getenv("CIA_RUN_TOKEN_BUDGET", "60000"))
+
+
+def nightly_at() -> str:
+    """HH:MM (container clock, UTC) of the nightly fallback run while no daily_snapshot.v1 arrives;
+    empty disables it."""
+    return os.getenv("CIA_NIGHTLY_AT", "03:00")

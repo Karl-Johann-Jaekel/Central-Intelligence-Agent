@@ -22,7 +22,7 @@ from psycopg.types.json import Jsonb
 
 from cia.llm.provider import Usage
 
-Trigger = Literal["daily_snapshot", "insight", "admin", "question"]
+Trigger = Literal["daily_snapshot", "insight", "admin", "question", "schedule"]
 SpanKind = Literal["task", "step", "tool", "llm", "spawn"]
 RunStatus = Literal["running", "completed", "failed", "budget_exceeded"]
 SpanStatus = Literal["running", "ok", "error", "rejected"]
